@@ -13,3 +13,5 @@ It will clean & dump those  links on  'doctolib_profile_link.csv'
 After that  it will automatically go to each profile link  & scrap data. 
 It  will  save those  data  at 'doctolib_profile_details.csv' file.
 
+***********************
+Nord VPN required
