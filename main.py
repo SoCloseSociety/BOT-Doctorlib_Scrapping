@@ -11,6 +11,8 @@ from selenium.webdriver.common.by import By
 from bs4 import BeautifulSoup
 import time
 import random
+import socket
+
 
 from selenium.common.exceptions import (
     ElementNotVisibleException,
@@ -24,10 +26,27 @@ import csv
 import pandas as pd
 from glob import glob
 import os 
+import random
 
 
-specialization = input("Enter specialization : ")
-place = input("Enter place : ")
+def is_connected():
+  hostname = "one.one.one.one"  
+  try:
+    # see if we can resolve the host name -- tells us if there is
+    # a DNS listening
+    host = socket.gethostbyname(hostname)
+    # connect to the host -- tells us if the host is actually reachable
+    s = socket.create_connection((host, 80), 2)
+    s.close()
+    return True
+  except Exception:
+     pass # we ignore any errors, returning False
+  return False
+
+
+
+
+link = input("Enter Link : ")
 
 options = webdriver.ChromeOptions()
 options.add_experimental_option('excludeSwitches', ['enable-logging'])
@@ -35,16 +54,37 @@ options.add_experimental_option('excludeSwitches', ['enable-logging'])
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)  # version_main allows to specify your chrome version instead of following chrome global version
 driver.maximize_window()
 
+driver.get(link)  
+
+while(True):
+    try:
+        driver.find_element(By.CLASS_NAME, 'results')
+        break
+    except:
+        driver.close()
+        os.system('nordvpn -c')
+        time.sleep(10)
+
+        while(True):
+            if(is_connected()==False):
+                os.system('nordvpn -c')
+                time.sleep(10)
+            elif(is_connected()==True):
+                break    
+                
+
+        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)  # version_main allows to specify your chrome version instead of following chrome global version
+        driver.maximize_window()
+        driver.get(link) 
 
 
-
-driver.get('https://www.doctolib.fr/'+specialization.lower()+'/'+place)  
+time.sleep(5)
+driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
 
 html = driver.page_source
 soup = BeautifulSoup(html, features="html.parser")
 
-# with open("my_test.html", "w", encoding='utf-8') as file:
-#     file.write(str(soup))
+
 
 result_section = soup.find_all("a", {"class": "dl-search-result-name js-search-result-path"})
 
@@ -62,14 +102,6 @@ for s_t in soup.find_all('div', {"class": "dl-search-result-subtitle"}):
 
 
 clean_profile_link = []
-# for i in range(len(result_subtitle)):
-#     if ("Cardiologue" in result_subtitle[i].text):
-#         clean_profile_link.append(profile_links[i])
-
-
-# next_page_link = soup.find('div', {"class": "next"})
-# next_page_link2 = next_page_link.find('a')
-# print(next_page_link2['href'])
 
 
 
@@ -78,40 +110,57 @@ page = 2
 
 while(True):
     try:
-        time.sleep(5)
+        driver.get(link+'/?page='+str(page)) 
 
-        driver.get('https://www.doctolib.fr/'+specialization.lower()+'/'+place+'/?page='+str(page))  
-        time.sleep(2)
-        html = driver.page_source
-        soup = BeautifulSoup(html, features="html.parser")
-        for a in soup.find_all('a', {"class": "dl-search-result-name js-search-result-path"}, href=True):
-            profile_links.append(a['href'])
+        while(True):
+            time.sleep(5)
+            try:
+                driver.find_element(By.XPATH, '//*[@id="doctor_search_bar"]')
+                break
+            except:
+                driver.close()
+                os.system('nordvpn -c')
+                time.sleep(10)
 
-        for s_t in soup.find_all('div', {"class": "dl-search-result-subtitle"}):
-            profile_subtitle_link.append(s_t)
-        
-        page = page + 1
+                while(True):
+                    if(is_connected()==False):
+                        os.system('nordvpn -c')
+                        time.sleep(10)
+                    elif(is_connected()==True):
+                        break    
 
-        # if  page == 3:
-        #     break
+                driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options) 
+                driver.maximize_window()
+                driver.get(link+'/?page='+str(page)) 
+            
+        try:
+            driver.find_element(By.CLASS_NAME, 'results')
+            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+            time.sleep(2)
+            html = driver.page_source
+            soup = BeautifulSoup(html, features="html.parser")
+            for a in soup.find_all('a', {"class": "dl-search-result-name js-search-result-path"}, href=True):
+                profile_links.append(a['href'])
+
+            for s_t in soup.find_all('div', {"class": "dl-search-result-subtitle"}):
+                profile_subtitle_link.append(s_t)
+                
+            page = page + 1
+
+        except:
+            break
 
 
 
+    except:
+        print("Major error occured")
 
 
-    except Exception as e:
-        print(e)
-        break
-
-
-for i in range(len(profile_subtitle_link)):
-    if (specialization.capitalize() in profile_subtitle_link[i].text):
-        clean_profile_link.append(profile_links[i])
 
 print(len(profile_links))
 print(len(profile_subtitle_link))
 
-clean_profile_link = list(set(clean_profile_link))
+clean_profile_link = list(set(profile_links))
 
 
 print(len(clean_profile_link))
@@ -122,6 +171,9 @@ df = pd.DataFrame(dict)
 
 df.to_csv('doctolib_profile_link.csv')
 
+
+
+##############################################################################################################################
 my_dr_name = []
 my_dr_address = []
 my_dr_skills = []
@@ -140,11 +192,33 @@ with open('doctolib_profile_link.csv', 'r', encoding="utf-8") as file:
             skills_list = []
             degree_achivment = []
             #contact_section = []
-
+            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options)  # version_main allows to specify your chrome version instead of following chrome global version
+            driver.maximize_window()
             driver.get("https://www.doctolib.fr"+row[1])  
-            time.sleep(2)
+            while(True):
+                try:
+                    driver.find_element(By.CLASS_NAME, 'dl-profile-header-name')
+                    break
+                except:
+                    driver.close()
+                    os.system('nordvpn -c')
+                    time.sleep(10)
+
+                    while(True):
+                        if(is_connected()==False):
+                            os.system('nordvpn -c')
+                            time.sleep(10)
+                        elif(is_connected()==True):
+                            break    
+                            
+
+                    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options) 
+                    driver.maximize_window()
+                    driver.get("https://www.doctolib.fr"+row[1])
+
+
+            time.sleep(5)
             driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(2)
             html = driver.page_source
             soup = BeautifulSoup(html, features="html.parser")
 
@@ -236,11 +310,30 @@ with open('doctolib_profile_link.csv', 'r', encoding="utf-8") as file:
 
             for a in soup.find_all('a', {"class": "dl-text"}, href=True):
                 if present_link in a['href']:
-                    #print(a['href'])
                     driver.get("https://www.doctolib.fr"+a['href'])  
-                    time.sleep(2)
+                    while(True):
+                        try:
+                            driver.find_element(By.CLASS_NAME, 'dl-profile-header-name')
+                            break
+                        except:
+                            driver.close()
+                            os.system('nordvpn -c')
+                            time.sleep(10)
+
+                            while(True):
+                                if(is_connected()==False):
+                                    os.system('nordvpn -c')
+                                    time.sleep(10)
+                                elif(is_connected()==True):
+                                    break    
+                                    
+
+                            driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()),options=options) 
+                            driver.maximize_window()
+                            driver.get("https://www.doctolib.fr"+row[1])
+
+                    time.sleep(5)
                     driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-                    time.sleep(2)
                     html = driver.page_source
                     soup = BeautifulSoup(html, features="html.parser")
 
@@ -339,18 +432,22 @@ with open('doctolib_profile_link.csv', 'r', encoding="utf-8") as file:
             my_dr_skills.append(skills_of_dr)
             my_dr_degree_achivment.append(degree_achivment_of_dr)
 
-print(len(my_dr_name))
-print(len(my_dr_address))
-print(len(my_dr_skills))
-print(len(my_dr_degree_achivment))
+            print(len(my_dr_name))
+            print(len(my_dr_address))
+            print(len(my_dr_skills))
+            print(len(my_dr_degree_achivment))
 
-dict = {'Name': my_dr_name, 'Address & Contact': my_dr_address, 'Skills': my_dr_skills, 'Degree': my_dr_degree_achivment} 
-df2 = pd.DataFrame(dict)
+            dict = {'Name': my_dr_name, 'Address & Contact': my_dr_address, 'Skills': my_dr_skills, 'Degree': my_dr_degree_achivment} 
+            df2 = pd.DataFrame(dict)
 
-df2.to_csv('doctolib_profile_details.csv')          
+            df2.to_csv('doctolib_profile_details.csv')    
 
-            
+            driver.quit()    
+
             
              
+ 
+
+
  
 
